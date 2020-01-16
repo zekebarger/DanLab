@@ -1,5 +1,5 @@
 function varargout = AS_exportTDT(varargin)
-% zeke barger 120819
+% zeke barger 011620
 % Exports EEG/EMG recording from TDT system into a format that can be
 % interpreted by AccuSleep. The onsets and offsets of laser stimuli, if
 % present are saved (in seconds).
@@ -434,10 +434,19 @@ for n = a:b % for each mouse selected
     EEG = eegData.streams.LFPs.data(EEGch,1:(originalSR/SR):end);
     EMG = emgData.streams.LFPs.data(EMGch,1:(originalSR/SR):end);
     % get laser stimulus onsets/offsets
-    pulse_onsets = eegData.epocs.LasT.onset; % get laser pulse onsets
-    pulse_onsets = pulse_onsets(1:(end-1)); % remove last entry
+    pulse_onsets = eegData.epocs.LasT.onset; % get laser pulse times
     pulse_offsets = eegData.epocs.LasT.offset;
-    pulse_offsets = pulse_offsets(1:(end-1)); % remove last entry
+    % the pulse times sometimes contain... infinity... get rid of that
+    pulse_onsets(isinf(pulse_onsets)) = [];
+    pulse_offsets(isinf(pulse_offsets)) = [];
+    % the last onset and offset are usually (always?) artifacts that appear
+    % simultaneously
+    % so, if we see that the last onset and offset are very close together,
+    % they should probably be removed
+    if abs(pulse_onsets(end) - pulse_offsets(end)) < 2
+        pulse_onsets = pulse_onsets(1:(end-1)); % remove last entry
+        pulse_offsets = pulse_offsets(1:(end-1)); % remove last entry
+    end
     % get onsets and offsets for pulse trains
     if isempty(pulse_onsets)
         onsets = [];
