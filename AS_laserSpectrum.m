@@ -1,9 +1,11 @@
 % zeke barger 011720 
-% plots EEG power spectrum to laser onset
-% simply averages across all trials
-% takes a dirlist or mouselist... but a dirlist is probably better
-% this re-uses some code from AS_brainstate so it's a little more
-% complicated than it needs to be :/
+% plots EEG power spectrum locked to laser stimuli
+% takes a dirlist or mouselist
+
+% TODO: 
+% for moueslist, subtract mean within mouse
+% for dirlist...
+% std looks weird
 
 function [] = AS_laserSpectrum()
 %% set these parameters before you run this
@@ -15,8 +17,8 @@ spectrogram_window = 5; % spectrogram window, in seconds (e.g., 5)
 spectrogram_step = 2.5; % spectrogram time step (e.g., 2.5)
 spectrogram_freq_lo = 1; % min frequency to show
 spectrogram_freq_hi = 30; % max frequency to show
-z_min = -4; % lower limit on z-scored values in the plot
-z_max = 4; % upper limit
+z_min = -1; % lower limit on z-scored values in the plot (e.g., -2)
+z_max = 1; % upper limit
 
 %% load and process data
 % EEG samples to collect before, during and after laser
@@ -140,12 +142,12 @@ percent_before = before_samples / (before_samples + after_samples + laser_sample
 t_steps_before = round(percent_before * length(t));
 
 % for each frequency band, z-score based on pre-laser average / SD
-mu = zeros(length(f),1);
-sig = zeros(1,length(f));
+mu = zeros(1,length(f));
+sig = zeros(1, length(f));
 for i = 1:length(f)
-    mu(i) = mean(mean(specs(i,1:t_steps_before,:))); 
-    sig(i) = std(reshape(specs(i,1:t_steps_before,:), 1, ...
-        numel(specs(i,1:t_steps_before,:))));
+    mu(i) = mean(mean(specs(1:t_steps_before,i,:))); 
+    sig(i) = std(reshape(specs(1:t_steps_before,i,:), 1, ...
+        numel(specs(1:t_steps_before,i,:))));
 end
 spec_avg = mean(specs,3);
 spec_z = spec_avg - mu;
@@ -154,11 +156,20 @@ spec_z(spec_z < z_min) = z_min;
 spec_z(spec_z > z_max) = z_max;
 
 %% plot
+t = t - before;
 figure('Color','w');
-imagesc(t,f,spec_z);
-
-
-
+imagesc(t,f,spec_z');
+axis xy
+caxis([z_min z_max])
+colormap(gca,cat(1,cat(2,(0:127)'./127,(0:127)'./127,ones(128,1)),...
+    cat(2,ones(128,1),(127:-1:0)'./127,(127:-1:0)'./127)))
+ylabel('Frequency (Hz)')
+xlabel('Time (s)')
+colorbar;
+title('z-scored EEG spectrogram')
+yl = ylim;
+hold on, plot([0 0],yl,'k');
+hold on, plot([laser_duration,laser_duration],yl,'k');
 
 % Make a matrix (M) of EEG data (rows are trials, columns are
 %   timepoints) time locked to laser stimuli
