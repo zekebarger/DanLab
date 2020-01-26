@@ -1,11 +1,9 @@
-% zeke barger 011720 
+% zeke barger 012620 
 % plots EEG power spectrum locked to laser stimuli
 % takes a dirlist or mouselist
-
-% TODO: 
-% for moueslist, subtract mean within mouse
-% for dirlist...
-% std looks weird
+% for each recording (day), find z-scored changes from baseline
+% for each mouse, average across days weighted by trials per day
+% then average across mice
 
 function [] = AS_laserSpectrum()
 %% set these parameters before you run this
@@ -17,7 +15,7 @@ spectrogram_window = 5; % spectrogram window, in seconds (e.g., 5)
 spectrogram_step = 2.5; % spectrogram time step (e.g., 2.5)
 spectrogram_freq_lo = 1; % min frequency to show
 spectrogram_freq_hi = 30; % max frequency to show
-z_min = -1; % lower limit on z-scored values in the plot (e.g., -2)
+z_min = -1; % lower limit on z-scored values in the plot (e.g., -1)
 z_max = 1; % upper limit
 
 %% load and process data
@@ -35,21 +33,15 @@ if ~ischar(fname)
 end
 
 % Load either a mouselist (for multiple mice) or dirlist (for 1 mouse).
-% If only a dirlist is selected, the analysis will be the same except we
-% will will treat each day's data as if it came from a different mouse.
-% This lets us re-use the same code. dirlistMode indicates whether we are
-% dealing with a dirlist (1) or a mouselist (0).
 temp = load([fpath,fname],'mouselist'); % load list of dirlists
 if ~isfield(temp,'mouselist')
     temp = load([fpath,fname],'dirlist'); % load dirlist
     if ~isfield(temp,'dirlist')
         return
     end
-    mouselist = temp.dirlist;
-    dirlistMode = 1;
+    mouselist = {[fpath,fname]};
 else
     mouselist = temp.mouselist;
-    dirlistMode = 0;
 end
 
 if isempty(mouselist) % nothing in the list
@@ -62,77 +54,66 @@ nMice = length(mouselist); % how many mice there are
 allMiceData = cell(1, nMice); % laser locked brain states, one cell per mouse
 allMiceFiles = cell(1, nMice); % locations of files
 nDays = zeros(1,nMice); % how many days there are for each mouse
-% if we are dealing with a mouselist
-if ~dirlistMode
-    % check that the contents of the mouselist are ok, and gather filenames
-    for m = 1:nMice % for each mouse
-        % find EEG and laser data
-        temp = load(mouselist{m},'dirlist');
-        dirlist = temp.dirlist;
-        [problemString, fileNames] = AS_checkList(dirlist, {'EEG','laser'});
-        % if something is wrong with this mouse
-        if ~isempty(problemString)
-            % display the problem and quit
-            disp(problemString)
-            return
-        end
-        % continue on, storing the locations of the files for this mouse
-        allMiceFiles{m} = fileNames;
-        nDays(m) = length(dirlist);
-    end
-else % we are dealing with a dirlist
-    [problemString, fileNames] = AS_checkList(mouselist, {'EEG','laser'});
-    % if something is wrong with this list
+
+% check that the contents of the mouselist are ok, and gather filenames
+for m = 1:nMice % for each mouse
+    % find EEG and laser data
+    temp = load(mouselist{m},'dirlist');
+    dirlist = temp.dirlist;
+    [problemString, fileNames] = AS_checkList(dirlist, {'EEG','laser'});
+    % if something is wrong with this mouse
     if ~isempty(problemString)
         % display the problem and quit
         disp(problemString)
         return
     end
-    for m = 1:nMice % for each recording
-        allMiceFiles{m} = {fileNames{m}};
-        nDays(m) = 1; % just one "day"
-    end
+    % continue on, storing the locations of the files for this mouse
+    allMiceFiles{m} = fileNames;
+    nDays(m) = length(dirlist);
 end
 
-trialsPerMouse = zeros(1,nMice);
+trialsPerDay = zeros(nMice, max(nDays));
 wb = waitbar(0,'Loading...');
 for m = 1:nMice % for each mouse
     waitbar(m/nMice,wb); % update progress bar
-    allMiceData{m} = []; % initialize array of trial info
+    allMiceData{m} = {}; % initialize 
     for d = 1:nDays(m) % for each day
         % get laser-locked EEG
-        allMiceData{m} = [allMiceData{m}; getLaserEEG(allMiceFiles{m}{d}{1}, ...
-            allMiceFiles{m}{d}{2},before_samples,laser_samples,after_samples, SR)];
+        allMiceData{m}{d} = getLaserEEG(allMiceFiles{m}{d}{1}, ...
+            allMiceFiles{m}{d}{2},before_samples,laser_samples,after_samples, SR);
+        % number of rows is the number of trials for this animal
+        trialsPerDay(m,d) = size(allMiceData{m}{d}, 1);
     end
-    % number of rows is the number of trials for this animal
-    trialsPerMouse(m) = size(allMiceData{m}, 1);
 end
 delete(wb)
 
 % no trials found? quit
-if sum(trialsPerMouse) == 0
+totalNumTrials = sum(sum(trialsPerDay));
+if totalNumTrials == 0
     disp('no trials found :(')
     return
 end
 
-% preallocate a huge matrix of spectrograms
-% by first finding the size of the spectrogram
-% but first, find first trial and get its EEG
-EEG = allMiceData{find(trialsPerMouse, 1)}(1,:);
+% preallocate spectrograms by first finding the size of the spectrogram
+% so, find first trial and get its EEG
+[r,c] = find(trialsPerDay); % select days with trials
+EEG = allMiceData{r(1)}{c(1)}(1,:); % get EEG of first trial
 [s_temp, ~, ~] = makeSpectro(EEG, SR, spectrogram_step, ...
     spectrogram_window, spectrogram_freq_lo, spectrogram_freq_hi);
-specs = zeros(size(s_temp,1), size(s_temp,2), sum(trialsPerMouse));
-
-% for each mouse, get spectrograms
-idx = 1; % nth spectrogram created
+specs = cell(1,nMice);
 wb = waitbar(0,'creating spectrograms...');
-for i = 1:nMice % mouse
-    for j = 1:trialsPerMouse(i) % trial
-        waitbar(idx/sum(trialsPerMouse),wb); % update progress bar
-        [specs(:,:,idx), t, f] = makeSpectro(allMiceData{i}(j,:), SR, ...
-            spectrogram_step, spectrogram_window, spectrogram_freq_lo,...
-            spectrogram_freq_hi);
-        idx = idx+1;
+idx = 1; % nth spectrogram created
+
+for m = 1:nMice
+    for d = 1:nDays(m) % for each day, preallocate
+        specs{m}{d} = zeros(size(s_temp,1), size(s_temp,2), trialsPerDay(m,d));
+        for j = 1:trialsPerDay(m,d) % trial
+            waitbar(idx/totalNumTrials,wb); % update progress bar
+            [specs{m}{d}(:,:,j), t, f] = makeSpectro(allMiceData{m}{d}(j,:), SR, ...
+                spectrogram_step, spectrogram_window, spectrogram_freq_lo,...
+                spectrogram_freq_hi);
+            idx = idx+1;
+        end
     end
 end
 delete(wb)
@@ -141,24 +122,34 @@ delete(wb)
 percent_before = before_samples / (before_samples + after_samples + laser_samples);
 t_steps_before = round(percent_before * length(t));
 
+% preallocate z-scored spectrogram stacks for each mouse
+zStacks = cell(1, nMice);
+mouseMeans = zeros(size(s_temp,1), size(s_temp,2), nMice);
 % for each frequency band, z-score based on pre-laser average / SD
-mu = zeros(1,length(f));
-sig = zeros(1, length(f));
-for i = 1:length(f)
-    mu(i) = mean(mean(specs(1:t_steps_before,i,:))); 
-    sig(i) = std(reshape(specs(1:t_steps_before,i,:), 1, ...
-        numel(specs(1:t_steps_before,i,:))));
+for m = 1:nMice
+    zStacks{m} = zeros(size(s_temp,1), size(s_temp,2), nDays(m));
+    for d = 1:nDays(m)
+        mu = zeros(1,length(f));
+        sig = zeros(1, length(f));
+        for i = 1:length(f)
+            mu(i) = mean(mean(specs{m}{d}(1:t_steps_before,i,:)));
+            sig(i) = std(reshape(specs{m}{d}(1:t_steps_before,i,:), 1, ...
+                numel(specs{m}{d}(1:t_steps_before,i,:))));
+        end
+        spec_avg = mean(specs{m}{d},3);
+        spec_z = spec_avg - mu;
+        spec_z = spec_z ./ sig;
+        % for weighted averaging
+        spec_z = spec_z * trialsPerDay(m,d);
+        zStacks{m}(:,:,d) = spec_z;
+    end
+    mouseMeans(:,:,m) = mean(sum(zStacks{m},3)/sum(trialsPerDay(m,:)),3);
 end
-spec_avg = mean(specs,3);
-spec_z = spec_avg - mu;
-spec_z = spec_z ./ sig;
-spec_z(spec_z < z_min) = z_min;
-spec_z(spec_z > z_max) = z_max;
-
+grandMean = mean(mouseMeans,3);
 %% plot
 t = t - before;
 figure('Color','w');
-imagesc(t,f,spec_z');
+imagesc(t,f,grandMean');
 axis xy
 caxis([z_min z_max])
 colormap(gca,cat(1,cat(2,(0:127)'./127,(0:127)'./127,ones(128,1)),...
