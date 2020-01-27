@@ -1,11 +1,12 @@
-% zeke barger 121319 
+% zeke barger 012720
 % plots brain state relative to laser onset
 % averages across animals and uses bootstrapping
 % requires a mouselist (list of dirlist file locations)
 
-%TODO 
-% transition asterisks
-% brain state legend with errorbars
+%TODO
+% transition asterisks and diagram
+% eyfp comparison
+
 
 function [] = AS_brainstate()
 %% set parameters
@@ -14,28 +15,34 @@ before = 240; % seconds before laser onset to display (default 240)
 after = 240; % seconds after to display (default 240)
 laser_duration = 120; % laser duration in sec
 state_bin = 2.5; % epoch length for brain state classification
-
-% calculate some things based on those parameters
+% order to plot the lines (last entry is plotted on top). 1=R, 2=W, 3=N
+plot_order = [2 3 1];
 % line colors (REM, wake, NREM)
 colors = [43 160 220;
-            129 131 132
-            255 194 61] ./ 255;
+    129 131 132
+    255 194 61] ./ 255;
 % error bar colors
 errorcolors = [43 160 220;
-                171 172 172
-                255 194 61] ./ 255;
-% color for edge of error bars      
+    81 82 82
+    255 194 61] ./ 255;
+% color for edge of error bars
 edgecolors = [150 207 238;
-                194 195 196;
-                244 212 153] ./ 255;
+    194 195 196;
+    244 212 153] ./ 255;
+% transparency of error bars
+bar_alphas = [.4 .4 .4];
+
+
+% no need to edit these lines
 % epochs to plot before, during and after laser
 before_epochs = round(before/state_bin); % number of bins before laser
 after_epochs = round(after/state_bin); % number of bins after laser
 laser_epochs = round(laser_duration / state_bin); % number of bins during laser
 
+
 %% load and process data
-% have user select the mouselist 
-[fname,fpath,~] = uigetfile('*','Select mouselist or dirlist');
+% have user select the mouselist
+[fname,fpath,~] = uigetfile('*','Select mouselist or dirlist for TREATMENT condition');
 % check if something was selected
 if ~ischar(fname)
     disp('no list selected');
@@ -145,7 +152,7 @@ for itr = 1:iters
             bsItrAvg(m,:,k) = mean(bsdata==k);
         end
     end
-
+    
     bsavg(itr,:,:) = mean(bsItrAvg,1);
     diffs(itr,:) = squeeze(mean(bsavg(itr,1:pre_lsr_pts,:))) -...
         squeeze(mean(bsavg(itr,(1:lsr_pts)+pre_lsr_pts,:)));
@@ -159,19 +166,25 @@ CIs = CIs*100;
 grandMean = 100*mean(mouseAvgs,3);
 
 %% plot
+state_labels = {'REM','Wake','NREM'};
+state_labels = state_labels(plot_order);
+
 figure('Color','w')
 fill([0 laser_duration laser_duration 0],[0 0 100 100],[154 154 255]./255,'EdgeAlpha',0,'FaceAlpha',.5);
-
 
 t = (1:(after_epochs+before_epochs+laser_epochs))*state_bin - before_epochs*state_bin - state_bin/2;
 t_flip = cat(2,t,fliplr(t));
 
-alphas = [.4 1 .4];
-leg = [];
-for i = [2 3 1] 
-    hold on, fill(t_flip, cat(2,CIs(1,:,i),fliplr(CIs(2,:,i))),...
-        errorcolors(i,:), 'EdgeColor', edgecolors(i,:),'FaceAlpha', alphas(i),'LineWidth',1.5);
-    hold on, leg(i) = plot(t, grandMean(i,:), 'Color',colors(i,:), 'LineWidth',1.5);
+legend_mean = [];
+legend_shading = [];
+legend_top = [];
+legend_bottom = [];
+for i = plot_order
+    hold on, legend_shading(i) = fill(t_flip, cat(2,CIs(1,:,i),fliplr(CIs(2,:,i))),...
+        errorcolors(i,:), 'EdgeAlpha', 0,'FaceAlpha', bar_alphas(i),'LineWidth',1.5);
+    hold on, legend_mean(i) = plot(t, grandMean(i,:), 'Color',colors(i,:), 'LineWidth',1.5);
+    hold on, legend_top(i) = plot(t, CIs(2,:,i), 'Color',edgecolors(i,:), 'LineWidth',1);
+    hold on, legend_bottom(i) = plot(t, CIs(1,:,i), 'Color',edgecolors(i,:), 'LineWidth',1);
 end
 
 xlim([-1*before,after+laser_duration])
@@ -179,10 +192,31 @@ ylim([0 100])
 xlabel('Time (s)')
 ylabel('Percentage (%)')
 set(gca,'YTick',0:20:100,'LineWidth',1,'FontSize',12)
-legend(leg([3 2 1]),{'NREM','Wake','REM'},'FontSize',13)
+[~,lh] = legend([legend_shading(fliplr(plot_order)),legend_mean(fliplr(plot_order)),...
+    legend_top(fliplr(plot_order)),legend_bottom(fliplr(plot_order))],...
+    [fliplr(state_labels),fliplr(state_labels),...
+    fliplr(state_labels),fliplr(state_labels)],'FontSize',13);
 legend('boxoff')
 box off
 
+lh(13).FaceAlpha = bar_alphas(plot_order(3));
+lh(14).FaceAlpha = bar_alphas(plot_order(2));
+lh(15).FaceAlpha = bar_alphas(plot_order(1));
+lh(13).EdgeAlpha = 0;
+lh(14).EdgeAlpha = 0;
+lh(15).EdgeAlpha = 0;
+lh(16).YData = lh(16).YData + (mean(lh(13).YData) - mean(lh(16).YData));
+lh(18).YData = lh(18).YData + (mean(lh(14).YData) - mean(lh(18).YData));
+lh(20).YData = lh(20).YData + (mean(lh(15).YData) - mean(lh(20).YData));
+lh(22).YData = lh(13).YData(2:3);
+lh(24).YData = lh(14).YData(2:3);
+lh(26).YData = lh(15).YData(2:3);
+lh(28).YData = lh(13).YData([1,4]);
+lh(30).YData = lh(14).YData([1,4]);
+lh(32).YData = lh(15).YData([1,4]);
+for i = 4:12
+    lh(i).delete;
+end
 %% from Franz's code
 P = zeros(1,3);
 for i=1:3
@@ -216,7 +250,7 @@ for m = 1:nMice % for each mouse
     % resample the time-locked data
     % preallocate
     allMiceDataBinned{m} = zeros(size(allMiceData{m},1), size(allMiceData{m},2)/chunklen);
-
+    
     % downsample the brain state data
     for i = 1:size(allMiceData{m},1) % for each trial
         trialdata = allMiceData{m}(i,:);
@@ -231,7 +265,7 @@ for m = 1:nMice % for each mouse
                 else
                     chunk2(j) = abs(mode(-1*chunk));
                 end
-            end 
+            end
         end
         allMiceDataBinned{m}(i,:) = chunk2;
     end
@@ -240,7 +274,7 @@ end
 %% calculate transitions using binned data
 for m = 1:nMice % for each mouse
     tpm = []; % initialize transition probability matrix
-    for k = 1:size(allMiceDataBinned{m}, 1) % for each trial 
+    for k = 1:size(allMiceDataBinned{m}, 1) % for each trial
         tpm(:,:,k) = AS_getTransitions(allMiceDataBinned{m}(k,:), state_bin_new, binwidth);
     end
     tp{m} = tpm;
@@ -295,7 +329,7 @@ for itr = 1:iters
     for i = 1:nMice % find avg for each mouse
         tp_mtx(:,:,i) = mean(tpb{i},3);
     end
-
+    
     tp_avgb = mean(tp_mtx,3);
     
     for j = 1:totalpts % each timepoint
@@ -352,7 +386,7 @@ for i = 1:9
     hold on, bar(binwidth*(1:size(tp_avg,2))-binwidth/2,tp_avg(i,:),'FaceColor',[.98 .98 .98]);
     hold on, plot([binwidth*(1:size(tp_avg,2))-binwidth/2; binwidth*(1:size(tp_avg,2))-binwidth/2],...
         [tp_95ci(i,:,1);tp_95ci(i,:,2)],'k')
-        
+    
     title(labels{i})
     upperlim = max(tp_95ci(i,:,2));
     lowerlim = min(tp_95ci(i,:,1));
