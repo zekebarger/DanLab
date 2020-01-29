@@ -1,20 +1,21 @@
-% zeke barger 012720
+% zeke barger 012920
 % plots brain state relative to laser onset
 % averages across animals and uses bootstrapping
 % requires a mouselist (list of dirlist file locations)
 
 %TODO
-% transition asterisks and diagram
 % eyfp comparison
-
+% arbitrary time axis
 
 function [] = AS_brainstate()
 %% set parameters
-iters = 1000; % iterations for generating bootstrap confidence intervals (default 10000)
+% general parameters:
+iters = 100; % iterations for generating bootstrap confidence intervals (default 10000)
 before = 240; % seconds before laser onset to display (default 240)
 after = 240; % seconds after to display (default 240)
 laser_duration = 120; % laser duration in sec
 state_bin = 2.5; % epoch length for brain state classification
+% parameters for plotting brain state over time:
 % order to plot the lines (last entry is plotted on top). 1=R, 2=W, 3=N
 plot_order = [2 3 1];
 % line colors (REM, wake, NREM)
@@ -31,6 +32,16 @@ edgecolors = [150 207 238;
     244 212 153] ./ 255;
 % transparency of error bars
 bar_alphas = [.4 .4 .4];
+% parameters for transition analysis:
+binwidth = 60; % width of transition bins in sec
+state_bin_new = 20; % resample so each brain state "epoch" is this long, in sec
+sig_thresh = 0.05; % significance threshold
+% because we downsample the brain states to a lower time resolution, there
+% are usually some 'impossible' transitions between R-N and W-R. Setting
+% the flags below to 1 will convert these transitions to R-W and N-R,
+% respectively.
+rn_2_rw = 1;
+wr_2_nr = 1;
 
 
 % no need to edit these lines
@@ -54,7 +65,9 @@ end
 % will will treat each day's data as if it came from a different mouse.
 % This lets us re-use the same code. dirlistMode indicates whether we are
 % dealing with a dirlist (1) or a mouselist (0).
+warning('off','MATLAB:load:variableNotFound');
 temp = load([fpath,fname],'mouselist'); % load list of dirlists
+warning('on','MATLAB:load:variableNotFound');
 if ~isfield(temp,'mouselist')
     temp = load([fpath,fname],'dirlist'); % load dirlist
     if ~isfield(temp,'dirlist')
@@ -192,19 +205,21 @@ ylim([0 100])
 xlabel('Time (s)')
 ylabel('Percentage (%)')
 set(gca,'YTick',0:20:100,'LineWidth',1,'FontSize',12)
+box off
+
+% legend ;)
 [~,lh] = legend([legend_shading(fliplr(plot_order)),legend_mean(fliplr(plot_order)),...
     legend_top(fliplr(plot_order)),legend_bottom(fliplr(plot_order))],...
     [fliplr(state_labels),fliplr(state_labels),...
     fliplr(state_labels),fliplr(state_labels)],'FontSize',13);
 legend('boxoff')
-box off
-
-lh(13).FaceAlpha = bar_alphas(plot_order(3));
+lh(13).FaceAlpha = bar_alphas(plot_order(3)); % fix shading alpha
 lh(14).FaceAlpha = bar_alphas(plot_order(2));
 lh(15).FaceAlpha = bar_alphas(plot_order(1));
-lh(13).EdgeAlpha = 0;
+lh(13).EdgeAlpha = 0; % fix edge alpha
 lh(14).EdgeAlpha = 0;
 lh(15).EdgeAlpha = 0;
+% align lines with shading
 lh(16).YData = lh(16).YData + (mean(lh(13).YData) - mean(lh(16).YData));
 lh(18).YData = lh(18).YData + (mean(lh(14).YData) - mean(lh(18).YData));
 lh(20).YData = lh(20).YData + (mean(lh(15).YData) - mean(lh(20).YData));
@@ -214,8 +229,8 @@ lh(26).YData = lh(15).YData(2:3);
 lh(28).YData = lh(13).YData([1,4]);
 lh(30).YData = lh(14).YData([1,4]);
 lh(32).YData = lh(15).YData([1,4]);
-for i = 4:12
-    lh(i).delete;
+for i = 4:12 % remove entry labels we don't need
+    lh(i).String='';
 end
 %% from Franz's code
 P = zeros(1,3);
@@ -238,9 +253,6 @@ disp(['Wake: ',num2str(P(2))])
 disp(['NREM: ',num2str(P(3))])
 
 %% transition analysis - preprocessing
-binwidth = 60; % width of transition bins in sec
-state_bin_new = 20; % resample so each brain state "epoch" is this long, in sec
-
 chunklen = state_bin_new / state_bin;
 tp = cell(1,nMice); %zeke's transition probability
 
@@ -276,6 +288,14 @@ for m = 1:nMice % for each mouse
     tpm = []; % initialize transition probability matrix
     for k = 1:size(allMiceDataBinned{m}, 1) % for each trial
         tpm(:,:,k) = AS_getTransitions(allMiceDataBinned{m}(k,:), state_bin_new, binwidth);
+    end
+    if wr_2_nr
+        tpm(7,:,:) = tpm(7,:,:) + tpm(4,:,:);
+        tpm(4,:,:) = 0;
+    end
+    if rn_2_rw
+        tpm(2,:,:) = tpm(2,:,:) + tpm(3,:,:);
+        tpm(3,:,:) = 0;
     end
     tp{m} = tpm;
 end
@@ -322,6 +342,14 @@ for itr = 1:iters
         for k = randi(mousetrials(m),1,mousetrials(m))
             tpm(:,:,j) = AS_getTransitions(allMiceDataBinned{m}(k,:), state_bin_new, binwidth);
             j = j+1;
+        end
+        if wr_2_nr
+            tpm(7,:,:) = tpm(7,:,:) + tpm(4,:,:);
+            tpm(4,:,:) = 0;
+        end
+        if rn_2_rw
+            tpm(2,:,:) = tpm(2,:,:) + tpm(3,:,:);
+            tpm(3,:,:) = 0;
         end
         tpb{m} = tpm;
     end
@@ -371,50 +399,44 @@ end
 bl_mean = mean(baselines,2);
 
 figure('Color','w','Position',[900,296,811,653])
-labels = {'REM \rightarrow REM','REM \rightarrow Wake','REM \rightarrow NREM',...
-    'Wake \rightarrow REM','Wake \rightarrow Wake','Wake \rightarrow NREM',...
-    'NREM \rightarrow REM','NREM \rightarrow Wake','NREM \rightarrow NREM'};
+labels = {'R \rightarrow R','R \rightarrow W','R \rightarrow N',...
+    'W \rightarrow R','W \rightarrow W','W \rightarrow N',...
+    'N \rightarrow R','N \rightarrow W','N \rightarrow N'};
 labelstxt = {'REM -> REM','REM -> Wake','REM -> NREM','Wake -> REM','Wake -> Wake',...
     'Wake -> NREM','NREM -> REM','NREM -> Wake','NREM -> NREM'};
 xpos = [.08 .4 .71 .08 .4 .71 .08 .4 .71];
-ypos = [.71 .71 .71 .39 .39 .39 .07 .07 .07];
-
+ypos = [.72 .72 .72 .40 .40 .40 .08 .08 .08];
+th = {};
+titleFS = 14;
+asteriskFS = 35;
+tplot_order = [5 4 6 3 1 2 8 7 9];
+ac = {};
 for i = 1:9
-    axes('Position',[xpos(i) ypos(i) .25 .25])
+    if (rn_2_rw && i == 3) || (wr_2_nr && i == 4)
+        continue
+    end
+    axes('Position',[xpos(tplot_order(i)) ypos(tplot_order(i)) .24 .20])
     fill([before before+laser_duration before+ laser_duration before],...
         [0 0 1 1],[0 0 1], 'EdgeColor', 'none','FaceAlpha', 0.2)
     hold on, bar(binwidth*(1:size(tp_avg,2))-binwidth/2,tp_avg(i,:),'FaceColor',[.98 .98 .98]);
     hold on, plot([binwidth*(1:size(tp_avg,2))-binwidth/2; binwidth*(1:size(tp_avg,2))-binwidth/2],...
         [tp_95ci(i,:,1);tp_95ci(i,:,2)],'k')
     
-    title(labels{i})
     upperlim = max(tp_95ci(i,:,2));
     lowerlim = min(tp_95ci(i,:,1));
     
-    if upperlim < .1
-        ylim([0 .1])
+    if upperlim < .3
+        ylim([0 .3])
     else
-        if upperlim < .25
-            ylim([0 .25])
-        else
-            if upperlim < .5
-                ylim([0 .5])
-            else
-                if lowerlim > 0.6
-                    ylim([floor(lowerlim*10)/10 1])
-                else
-                    ylim([0 1])
-                end
-            end
-        end
+        ylim([0 1])
     end
     xlim([0, before+after+laser_duration])
     
     if i == 8
         xlabel('Time (s)')
     end
-    if i == 4
-        ylabel('Transition probability')
+    if i == 5 || (i == 2 || i ==8)
+        ylabel('Probability')
     end
     
     % plot baseline
@@ -425,12 +447,138 @@ for i = 1:9
         set(gca,'XTick',0:60:(laser_duration + before+after),'XTickLabel',...
             (0:60:(laser_duration + before+after))-before)
     else
-        set(gca,'XTick',[0 120 240 360 480 600],'XTickLabel',[-240 -120 0 120 240 360])
+        set(gca,'XTick',[0 120 240 360 480 600],...
+            'XTickLabel',[-240 -120 0 120 240 360],...
+            'FontSize',12)
+    end
+    
+    % title
+    title({labels{i};'*'},'Color','w','FontSize',titleFS); % placeholder
+    th{i}=get(gca,'Title');
+    if mean(diffs(i,:)) > 0 && P(i) < sig_thresh
+        ac{i} = 'magenta';
+        as = '*';
+    else
+        if P(i) < sig_thresh
+            ac{i} = 'cyan';
+            as = '*';
+        else
+            ac{i} = 'white';
+            as = '';
+        end
+    end
+    text(th{i}.Position(1),th{i}.Position(2)*.94,{labels{i};''},...
+        'HorizontalAlignment','center','FontSize',titleFS,'Margin',3,'VerticalAlignment','bottom')
+    text(th{i}.Position(1),th{i}.Position(2)*.78,{['\fontsize{',num2str(asteriskFS),...
+        '}\color{',ac{i},'}',as]},...
+        'HorizontalAlignment','center','FontSize',13,'Margin',3,'VerticalAlignment','bottom')
+end
+
+% draw a diagram!
+axes('Position',[.66 .45 .28 .55])
+% draw letters
+text(.46, .69, 'N','FontSize',21)
+text(.20, .28, 'W','FontSize',21)
+text(.72, .28, 'R','FontSize',21)
+for i = 1:9 % convert white colors to black
+    if strcmp(ac{i},'white')
+        ac{i} = 'k';
     end
 end
+% draw straight arrows
+annotation('arrow',[.821 .870],[.758 .680],'HeadStyle','plain','LineWidth',2,...
+    'HeadLength',7,'HeadWidth',7,'Color',ac{7});
+annotation('arrow',[.847 .760],[.652 .652],'HeadStyle','plain','LineWidth',2,...
+    'HeadLength',7,'HeadWidth',7,'Color',ac{2});
+annotation('arrow',[.732 .779],[.691 .766],'HeadStyle','plain','LineWidth',2,...
+    'HeadLength',7,'HeadWidth',7,'Color',ac{6});
+annotation('arrow',[.791 .745],[.753 .680],'HeadStyle','plain','LineWidth',2,...
+    'HeadLength',7,'HeadWidth',7,'Color',ac{8});
+% draw curved arrows
+hold on, circular_arrow(.08, [.50 .82], 90, 280, 1, ac{9}, 9, .08);
+hold on, circular_arrow(.08, [.84 .19], 315, 280, 1, ac{1}, 9, .15);
+hold on, circular_arrow(.08, [.175 .19], 235, 280, 1, ac{5}, 9, .14);
+axis equal
+axis off
+
+% legend
+hold on, p1=plot([10 10],[10 10],'m','LineWidth',2);
+hold on, p2=plot([10 10],[10 10],'c','LineWidth',2);
+hold on, p3=plot([10 10],[10 10],'k','LineWidth',2);
+legend([p1 p2 p3],{'Significant increase','Significant decrease','No change'},...
+    'Position',[0.6775,0.4589,0.2416,0.1041],'FontSize',12)
+legend('boxoff')
+
+xlim([0 1])
+ylim([0 1])
 
 % display p values
 disp('p values (pre-laser vs. laser on):')
 for i = 1:9
     disp([labelstxt{i},' : ',num2str(P(i))])
+end
+
+
+function circular_arrow(radius, centre, arrow_angle, angle, direction, colour, head_size, qq)
+% by Zac Giles https://www.mathworks.com/matlabcentral/fileexchange/59917-circular_arrow
+arrow_angle = deg2rad(arrow_angle); % Convert angle to rad
+angle = deg2rad(angle); % Convert angle to rad
+xc = centre(1);
+yc = centre(2);
+x_temp = centre(1) + radius;
+y_temp = centre(2);
+x1 = (x_temp-xc)*cos(arrow_angle+angle/2) - ...
+        (y_temp-yc)*sin(arrow_angle+angle/2) + xc;
+x2 = (x_temp-xc)*cos(arrow_angle-angle/2) - ...
+        (y_temp-yc)*sin(arrow_angle-angle/2) + xc;
+x0 = (x_temp-xc)*cos(arrow_angle) - ...
+        (y_temp-yc)*sin(arrow_angle) + xc;
+y1 = (x_temp-xc)*sin(arrow_angle+angle/2) + ...
+        (y_temp-yc)*cos(arrow_angle+angle/2) + yc;
+y2 = (x_temp-xc)*sin(arrow_angle-angle/2) + ... 
+        (y_temp-yc)*cos(arrow_angle-angle/2) + yc;
+y0 = (x_temp-xc)*sin(arrow_angle) + ... 
+        (y_temp-yc)*cos(arrow_angle) + yc;
+i = 1;
+P1 = struct([]);
+P2 = struct([]);
+P1{1} = [x1;y1]; % Point 1 - 1
+P1{2} = [x2;y2]; % Point 1 - 2
+P2{1} = [x0;y0]; % Point 2 - 1
+P2{2} = [x0;y0]; % Point 2 - 1
+centre = [xc;yc]; % guarenteeing centre is the right dimension
+n = 1000; % The number of points in the arc
+v = struct([]);
+while i < 3
+    v1 = P1{i}-centre;
+    v2 = P2{i}-centre;
+    c = det([v1,v2]); % "cross product" of v1 and v2
+    a = linspace(0,atan2(abs(c),dot(v1,v2)),n); % Angle range
+    v3 = [0,-c;c,0]*v1; % v3 lies in plane of v1 and v2 and is orthog. to v1
+    v{i} = v1*cos(a)+((norm(v1)/norm(v3))*v3)*sin(a); % Arc, center at (0,0)
+    plot(v{i}(1,:)+xc,v{i}(2,:)+yc,'Color', colour,'LineWidth',2) % Plot arc, centered at P0
+    i = i + 1;
+end
+position = struct([]);
+if direction == 1
+%     position{1} = [x2 y2 x2-(v{2}(1,2)+xc) y2-(v{2}(2,2)+yc)];
+    position{1} = [(v{2}(1,30)+xc), (v{2}(2,30)+yc),...
+        v{2}(1,10)-v{2}(1,n*qq), v{2}(2,10)-v{2}(2,n*qq)];
+elseif direction == -1
+    position{1} = [x1 y1 x1-(v{1}(1,2)+xc) y1-(v{1}(2,2)+yc)];
+elseif direction == 2
+    position{1} = [x2 y2 x2-(v{2}(1,2)+xc) y2-(v{2}(2,2)+yc)];
+    position{2} = [x1 y1 x1-(v{1}(1,2)+xc) y1-(v{1}(2,2)+yc)];  
+elseif direction == 0
+    % Do nothing
+else
+    error('direction flag not 1, -1, 2 or 0.');
+end
+i = 1;
+while i < abs(direction) + 1
+    h=annotation('arrow'); % arrow head
+    set(h,'parent', gca, 'position', position{i}, ...
+        'HeadLength', head_size, 'HeadWidth', head_size,...
+        'HeadStyle', 'plain', 'linestyle','none','Color', colour);
+    i = i + 1;
 end
