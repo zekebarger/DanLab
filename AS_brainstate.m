@@ -10,7 +10,7 @@
 function [] = AS_brainstate2()
 %% set parameters
 % general parameters:
-iters = 100; % iterations for generating bootstrap confidence intervals (default 10000)
+iters = 10000; % iterations for generating bootstrap confidence intervals (default 10000)
 before = 240; % seconds before laser onset to display (default 240)
 after = 240; % seconds after to display (default 240)
 laser_duration = 120; % laser duration in sec
