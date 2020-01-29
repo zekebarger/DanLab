@@ -1,16 +1,16 @@
 % zeke barger 012920
 % plots brain state relative to laser onset
 % averages across animals and uses bootstrapping
-% requires a mouselist (list of dirlist file locations)
+% requires a mouselist (list of dirlist file locations) or dirlist
 
 %TODO
 % eyfp comparison
 % arbitrary time axis
 
-function [] = AS_brainstate()
+function [] = AS_brainstate2()
 %% set parameters
 % general parameters:
-iters = 10000; % iterations for generating bootstrap confidence intervals (default 10000)
+iters = 100; % iterations for generating bootstrap confidence intervals (default 10000)
 before = 240; % seconds before laser onset to display (default 240)
 after = 240; % seconds after to display (default 240)
 laser_duration = 120; % laser duration in sec
@@ -39,7 +39,8 @@ sig_thresh = 0.05; % significance threshold
 % because we downsample the brain states to a lower time resolution, there
 % are usually some 'impossible' transitions between R-N and W-R. Setting
 % the flags below to 1 will convert these transitions to R-W and N-R,
-% respectively.
+% respectively. If both are not set to 1, the transition diagram will not
+% be shown.
 rn_2_rw = 1;
 wr_2_nr = 1;
 
@@ -475,42 +476,44 @@ for i = 1:9
 end
 
 % draw a diagram!
-axes('Position',[.66 .45 .28 .55])
-% draw letters
-text(.46, .69, 'N','FontSize',21)
-text(.20, .28, 'W','FontSize',21)
-text(.72, .28, 'R','FontSize',21)
-for i = 1:9 % convert white colors to black
-    if strcmp(ac{i},'white')
-        ac{i} = 'k';
+if rn_2_rw && wr_2_nr
+    axes('Position',[.66 .45 .28 .55])
+    % draw letters
+    text(.46, .69, 'N','FontSize',21)
+    text(.20, .28, 'W','FontSize',21)
+    text(.72, .28, 'R','FontSize',21)
+    for i = 1:9 % convert white colors to black
+        if strcmp(ac{i},'white')
+            ac{i} = 'k';
+        end
     end
+    % draw straight arrows
+    annotation('arrow',[.821 .870],[.758 .680],'HeadStyle','plain','LineWidth',2,...
+        'HeadLength',7,'HeadWidth',7,'Color',ac{7});
+    annotation('arrow',[.847 .760],[.652 .652],'HeadStyle','plain','LineWidth',2,...
+        'HeadLength',7,'HeadWidth',7,'Color',ac{2});
+    annotation('arrow',[.732 .779],[.691 .766],'HeadStyle','plain','LineWidth',2,...
+        'HeadLength',7,'HeadWidth',7,'Color',ac{6});
+    annotation('arrow',[.791 .745],[.753 .680],'HeadStyle','plain','LineWidth',2,...
+        'HeadLength',7,'HeadWidth',7,'Color',ac{8});
+    % draw curved arrows
+    hold on, circular_arrow(.08, [.50 .82], 90, 280, 1, ac{9}, 9, .08);
+    hold on, circular_arrow(.08, [.84 .19], 315, 280, 1, ac{1}, 9, .15);
+    hold on, circular_arrow(.08, [.175 .19], 235, 280, 1, ac{5}, 9, .14);
+    axis equal
+    axis off
+    
+    % legend
+    hold on, p1=plot([10 10],[10 10],'m','LineWidth',2);
+    hold on, p2=plot([10 10],[10 10],'c','LineWidth',2);
+    hold on, p3=plot([10 10],[10 10],'k','LineWidth',2);
+    legend([p1 p2 p3],{'Significant increase','Significant decrease','No change'},...
+        'Position',[0.6775,0.4589,0.2416,0.1041],'FontSize',12)
+    legend('boxoff')
+    
+    xlim([0 1])
+    ylim([0 1])
 end
-% draw straight arrows
-annotation('arrow',[.821 .870],[.758 .680],'HeadStyle','plain','LineWidth',2,...
-    'HeadLength',7,'HeadWidth',7,'Color',ac{7});
-annotation('arrow',[.847 .760],[.652 .652],'HeadStyle','plain','LineWidth',2,...
-    'HeadLength',7,'HeadWidth',7,'Color',ac{2});
-annotation('arrow',[.732 .779],[.691 .766],'HeadStyle','plain','LineWidth',2,...
-    'HeadLength',7,'HeadWidth',7,'Color',ac{6});
-annotation('arrow',[.791 .745],[.753 .680],'HeadStyle','plain','LineWidth',2,...
-    'HeadLength',7,'HeadWidth',7,'Color',ac{8});
-% draw curved arrows
-hold on, circular_arrow(.08, [.50 .82], 90, 280, 1, ac{9}, 9, .08);
-hold on, circular_arrow(.08, [.84 .19], 315, 280, 1, ac{1}, 9, .15);
-hold on, circular_arrow(.08, [.175 .19], 235, 280, 1, ac{5}, 9, .14);
-axis equal
-axis off
-
-% legend
-hold on, p1=plot([10 10],[10 10],'m','LineWidth',2);
-hold on, p2=plot([10 10],[10 10],'c','LineWidth',2);
-hold on, p3=plot([10 10],[10 10],'k','LineWidth',2);
-legend([p1 p2 p3],{'Significant increase','Significant decrease','No change'},...
-    'Position',[0.6775,0.4589,0.2416,0.1041],'FontSize',12)
-legend('boxoff')
-
-xlim([0 1])
-ylim([0 1])
 
 % display p values
 disp('p values (pre-laser vs. laser on):')
@@ -528,17 +531,17 @@ yc = centre(2);
 x_temp = centre(1) + radius;
 y_temp = centre(2);
 x1 = (x_temp-xc)*cos(arrow_angle+angle/2) - ...
-        (y_temp-yc)*sin(arrow_angle+angle/2) + xc;
+    (y_temp-yc)*sin(arrow_angle+angle/2) + xc;
 x2 = (x_temp-xc)*cos(arrow_angle-angle/2) - ...
-        (y_temp-yc)*sin(arrow_angle-angle/2) + xc;
+    (y_temp-yc)*sin(arrow_angle-angle/2) + xc;
 x0 = (x_temp-xc)*cos(arrow_angle) - ...
-        (y_temp-yc)*sin(arrow_angle) + xc;
+    (y_temp-yc)*sin(arrow_angle) + xc;
 y1 = (x_temp-xc)*sin(arrow_angle+angle/2) + ...
-        (y_temp-yc)*cos(arrow_angle+angle/2) + yc;
-y2 = (x_temp-xc)*sin(arrow_angle-angle/2) + ... 
-        (y_temp-yc)*cos(arrow_angle-angle/2) + yc;
-y0 = (x_temp-xc)*sin(arrow_angle) + ... 
-        (y_temp-yc)*cos(arrow_angle) + yc;
+    (y_temp-yc)*cos(arrow_angle+angle/2) + yc;
+y2 = (x_temp-xc)*sin(arrow_angle-angle/2) + ...
+    (y_temp-yc)*cos(arrow_angle-angle/2) + yc;
+y0 = (x_temp-xc)*sin(arrow_angle) + ...
+    (y_temp-yc)*cos(arrow_angle) + yc;
 i = 1;
 P1 = struct([]);
 P2 = struct([]);
@@ -561,14 +564,14 @@ while i < 3
 end
 position = struct([]);
 if direction == 1
-%     position{1} = [x2 y2 x2-(v{2}(1,2)+xc) y2-(v{2}(2,2)+yc)];
+    %     position{1} = [x2 y2 x2-(v{2}(1,2)+xc) y2-(v{2}(2,2)+yc)];
     position{1} = [(v{2}(1,30)+xc), (v{2}(2,30)+yc),...
         v{2}(1,10)-v{2}(1,n*qq), v{2}(2,10)-v{2}(2,n*qq)];
 elseif direction == -1
     position{1} = [x1 y1 x1-(v{1}(1,2)+xc) y1-(v{1}(2,2)+yc)];
 elseif direction == 2
     position{1} = [x2 y2 x2-(v{2}(1,2)+xc) y2-(v{2}(2,2)+yc)];
-    position{2} = [x1 y1 x1-(v{1}(1,2)+xc) y1-(v{1}(2,2)+yc)];  
+    position{2} = [x1 y1 x1-(v{1}(1,2)+xc) y1-(v{1}(2,2)+yc)];
 elseif direction == 0
     % Do nothing
 else
