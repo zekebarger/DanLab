@@ -1,5 +1,5 @@
 function varargout = AS_exportTDT(varargin)
-% zeke barger 011620
+% zeke barger 032020
 % Exports EEG/EMG recording from TDT system into a format that can be
 % interpreted by AccuSleep. The onsets and offsets of laser stimuli, if
 % present are saved (in seconds).
@@ -288,7 +288,7 @@ function namebox2_Callback(hObject, eventdata, handles)
 % update the stored name
 s = get(hObject,'String');
 s = strip(s,'\');
-set(handles.namebox,'String',s)
+set(handles.namebox2,'String',s)
 setappdata(handles.C,'outputName2',s);
 
 
