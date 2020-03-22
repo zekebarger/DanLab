@@ -179,8 +179,8 @@ if ~isempty(laser) % if there are some laser stimuli
     G.laser_by_epoch=G.laser_by_epoch*3+.5;
 end
 
-% some things we need for using Min's method
-G.minWindowUp = 0; % whether Min's scoring window is showing
+% some things we need for cluster scoring
+G.clusterWindowUp = 0; % whether the cluster scoring window is showing
 G.theta_f = G.f >= 6 & G.f <= 9;
 G.delta_f = G.f >= 1 & G.f <= 5;
 G.TDR = log(mean(G.spectrogram(:,G.theta_f),2)) ./ log(mean(G.spectrogram(:,G.delta_f),2));
@@ -285,8 +285,8 @@ G.showMenu = uicontrol(WIN,'Style','popupmenu','Units','normalized',...
     'Position',[0.93 0.54 0.062 0.02],'Callback', @fct_showmenu,...
     'String',{'Show 1 epoch','Show 3 epochs','Show 5 epochs','Show 7 epochs','Show 9 epochs'},...
     'Value',3);
-G.minbtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
-    'Position',[.93 .19 .062 .05],'String',"<html>Min's<br>method",'Callback',@minMethod,...
+G.clusterbtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
+    'Position',[.93 .19 .062 .05],'String',"<html>Cluster<br>scoring",'Callback',@clustering,...
     'FontSize',9);
 G.rangebtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
     'Position',[.93 .16 .062 .025],'String','set range','Callback',@setRange,...
@@ -473,8 +473,8 @@ message = 'Data loaded successfully';
             end
         end
         
-        if G.minWindowUp
-           minPlot; 
+        if G.clusterWindowUp
+           clusterPlot; 
         end
     end
 
@@ -850,165 +850,252 @@ message = 'Data loaded successfully';
         set(src, 'Enable', 'on');
     end
 
-% functions for Min's scoring method %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    % create the window and its contents
-    function minMethod(src,~)
-        if G.minWindowUp
+% functions for the cluster scoring method %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % create the widget and its contents
+    function clustering(src,~)
+        % don't do anything if the widget is already up
+        if G.clusterWindowUp
             return
         else
-            G.minWindowUp = 1;
+            G.clusterWindowUp = 1;
         end
         % draw the window and buttons
-        G.minBG = uibuttongroup('Position',[.06 .12 .34 .42]);
-        G.minXbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.93 0.92 0.063 0.07],'Callback', @minX,'String','X',...
-            'FontSize',9);
-        G.minClearbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.8 0.18 0.1],'Callback', @minClear,'String','Clear',...
-            'FontSize',9);
-        G.minNREMbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.68 0.18 0.1],'Callback', @minNREM,'String','NREM',...
+        G.clusterBG = uibuttongroup('Position',[.012 .02 .37 .53]);
+        G.clusterXbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.93 0.92 0.063 0.07],'Callback', @clusterX,'String','X',...
+            'FontSize',11,'BackgroundColor','r','ForegroundColor','w',...
+            'FontWeight','bold');
+        G.clusterNREMbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.79 0.18 0.1],'Callback', @clusterNREM,'String','NREM',...
             'FontSize',9,'BackgroundColor',[1 .96 .82]);
-        G.minWakebtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.57 0.18 0.1],'Callback', @minWake,'String','Wake',...
+        G.clusterWakebtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.68 0.18 0.1],'Callback', @clusterWake,'String','Wake',...
             'FontSize',9,'BackgroundColor',[.86 .88 1]);
-        G.minREMbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.46 0.18 0.1],'Callback', @minREM,'String','REM',...
+        G.clusterREMbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.57 0.18 0.1],'Callback', @clusterREM,'String','REM',...
             'FontSize',9,'BackgroundColor',[.84 .92 .73]);
-        G.minAssignbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.35 0.18 0.1],'Callback', @minAssign,'String',...
+        G.clusterAssignbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.46 0.18 0.1],'Callback', @clusterAssign,'String',...
             '<html>Assign<br>remaining','FontSize',8);
-        G.minDurationbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
-            'Position',[0.8 0.22 0.18 0.1],'Callback', @minDuration,'String',...
+        G.clusterDurationbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.33 0.18 0.1],'Callback', @clusterDuration,'String',...
             '<html>Remove<br>bouts &lt;','FontSize',8);
-        G.minDurationbox = uicontrol(G.minBG,'Style','edit', 'Units','normalized',...
-            'Position',[0.83 0.12 0.12 0.09],'String','5','FontSize',9);
-        G.minDurationtext = uicontrol(G.minBG,'Style','text', 'Units','normalized',...
-            'Position',[0.8 0.07 0.18 0.05],'String','seconds','FontSize',8);
-        G.minAxes = axes(G.minBG,'Position',[.08,.08,.7,.9],'XTick',[],'YTick',[]);
-        ylabel(G.minAxes,'Theta/delta ratio');
-        xlabel(G.minAxes,'EMG');
-        
-        % plot TDR and EMG
-        minPlot;
-
+        G.clusterDurationbox = uicontrol(G.clusterBG,'Style','edit', 'Units','normalized',...
+            'Position',[0.83 0.23 0.12 0.09],'String','5','FontSize',9);
+        G.clusterDurationtext = uicontrol(G.clusterBG,'Style','text', 'Units','normalized',...
+            'Position',[0.8 0.18 0.18 0.05],'String','seconds','FontSize',8);
+        G.clusterClearbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.06 0.18 0.07],'Callback', @clusterClear,'String','Clear',...
+            'FontSize',9);
+        G.clusterAxes = axes(G.clusterBG,'Position',[.075,.08,.7,.81],'XTick',[],'YTick',[]);
+        G.clusterZoomInbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.34 0.9 0.08 0.08],'Callback', @clusterZoomIn,'String','+',...
+            'FontSize',18,'FontWeight','bold');
+        G.clusterZoomOutbtn = uicontrol(G.clusterBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.44 0.9 0.08 0.08],'Callback', @clusterZoomOut,'String','-',...
+            'FontSize',18,'FontWeight','bold');
+        % set zoom properties
+        G.zoom_handle = zoom(gcf);
+        setAllowAxesZoom(G.zoom_handle,G.clusterAxes,1);
+        % label the axes
+        ylabel(G.clusterAxes,'Theta/delta ratio');
+        xlabel(G.clusterAxes,'EMG');
+        % find the current cluster boundaries
+        updatePoly;
+        % plot the clusters
+        clusterPlot;
+        % remove focus from all buttons so the keyboard inputs work
         defocus(src)
     end
 
-    function minX(src,~) % delete min's scoring window
-        G.minWindowUp = 0;
+    function clusterX(src,~) % delete the cluster widget
+        G.clusterWindowUp = 0;
         defocus(src);
-        delete(G.minBG);
+        delete(G.clusterBG);
     end
 
-    function minPlot()
+    function clusterPlot() % actually draw the cluster plot
         symbols = {'*','+','x','o'}; % symbol for each state
-        cla(G.minAxes);
-        for i = 1:4
-            hold on, line(G.minAxes,G.processedEMG(G.labels==i),G.TDR(G.labels==i),...
+        cla(G.clusterAxes); % remove anything in the plot
+        for i = 1:4 % draw each class of points
+            hold on, line(G.clusterAxes,G.processedEMG(G.labels==i),G.TDR(G.labels==i),...
                 'Marker',symbols{i},'LineStyle','none','Color',G.colors(i+1,:))
         end
-        for i = 1:3
+        for i = 1:3 % draw the polygonal cluster boundaries
             if ~isempty(G.polygons{i})
-                hold on, patch(G.minAxes,G.polygons{i}(:,1),G.polygons{i}(:,2),[0 0 0],...
+                hold on, patch(G.clusterAxes,G.polygons{i}(:,1),G.polygons{i}(:,2),[0 0 0],...
                     'FaceAlpha',0,'EdgeColor',G.colors(i+1,:),...
                     'EdgeAlpha',1);
             end
         end
+        % disable zoom controls
+        G.zoom_handle.Enable = 'off';
+        set(G.clusterZoomOutbtn,'BackgroundColor',[.94 .94 .94]);
+        set(G.clusterZoomInbtn,'BackgroundColor',[.94 .94 .94]);  
     end
 
-    function minClear(src,~) % clear all labels
-        G.labels(:) = 4;
-        G.unsavedChanges = 1;
-        updateState;
-        updatePlots;
-        G.polygons = cell(1,3);
-        minPlot;
+    function clusterZoomIn(src,~) % when user clicks zoom in button
+        if strcmp(G.zoom_handle.Enable,'on') % if zooming is enabled
+            if strcmp(G.zoom_handle.Direction,'in') % and is in the 'in' direction
+                % we should disable zooming
+                set(G.clusterZoomInbtn,'BackgroundColor',[.94 .94 .94]);
+                G.zoom_handle.Enable = 'off';
+                defocus(src)
+                return
+            else
+                % we switch from 'out' to 'in'
+                set(G.clusterZoomOutbtn,'BackgroundColor',[.94 .94 .94]);
+                set(G.clusterZoomInbtn,'BackgroundColor',[.7 .7 .95]);
+                G.zoom_handle.Direction = 'in';
+            end
+        else
+            % we should enable zooming in
+            set(G.clusterZoomInbtn,'BackgroundColor',[.7 .7 .95]);
+            G.zoom_handle.Enable = 'on';
+            G.zoom_handle.Direction = 'in';
+        end
+        defocus(src)
+    end
+
+    function clusterZoomOut(src,~) % same thing for the zoom out button
+        if strcmp(G.zoom_handle.Enable,'on')
+            if strcmp(G.zoom_handle.Direction,'out')
+                set(G.clusterZoomOutbtn,'BackgroundColor',[.94 .94 .94]);
+                G.zoom_handle.Enable = 'off';
+                defocus(src)
+                return
+            else
+                set(G.clusterZoomInbtn,'BackgroundColor',[.94 .94 .94]);
+                set(G.clusterZoomOutbtn,'BackgroundColor',[.7 .7 .95]);
+                G.zoom_handle.Direction = 'out';
+            end
+        else
+            set(G.clusterZoomOutbtn,'BackgroundColor',[.7 .7 .95]);
+            G.zoom_handle.Enable = 'on';
+            G.zoom_handle.Direction = 'out';
+        end
+        defocus(src)
+    end
+
+    function clusterClear(src,~) % clear all labels and reset the plot
+        G.labels(:) = 4; % set all labels to undefined
+        G.unsavedChanges = 1; % note that there are unsaved changes
+        updateState; % update the sleep state image
+        updatePlots; % update the rest of the plots in the main window
+        G.polygons = cell(1,3); % clear the cluster boundaries
+        axes(G.clusterAxes); % reset the zoom level
+        zoom out
+        clusterPlot; % plot the clusters
         defocus(src);
     end
 
-    function minAssign(src,~)
-        if (isempty(G.polygons{1}) || isempty(G.polygons{2})) || isempty(G.polygons{3})
+    % assign any undefined epochs to the nearest cluster
+    function clusterAssign(src,~) 
+        if ~any(G.labels ~= 4) % quit if all points are undefined
             return
         end
+        % display a waiting message
+        text_handle = text(.5,.95,'Please wait...',...
+            'Units','normalized','Color','r','HorizontalAlignment','center');
+        % get training data for the KNN model
         X_train = [];
         Y_train = [];
         X_train(:,1) = G.processedEMG(G.labels ~= 4);
         X_train(:,2) = G.TDR(G.labels ~= 4);
         Y_train(:,1) = G.labels(G.labels ~= 4);
+        % train the model
         Mdl = fitcknn(X_train,Y_train,'NumNeighbors',4);
+        % format the 'test' data
         X_test = [];
         X_test(:,1) = G.processedEMG(G.labels == 4);
         X_test(:,2) = G.TDR(G.labels == 4);
-        G.labels(G.labels == 4) = predict(Mdl,X_test);
-        updatePoly;
+        G.labels(G.labels == 4) = predict(Mdl,X_test); % classify the epochs
+        updatePoly; % update our polygons to reflect the new changes
         G.unsavedChanges = 1;
         updateState;
         updatePlots;
-        minPlot;
+        clusterPlot;
+        delete(text_handle);
         defocus(src);
     end
 
-    function minDuration(src,~)
-        minBoutLen = str2num(get(G.minDurationbox,'String'));
-        if isempty(minBoutLen)
+    function clusterDuration(src,~) % remove bouts shorter than a given duration
+        % get the minimum bout length
+        minBoutLen = str2num(get(G.clusterDurationbox,'String'));
+        if isempty(minBoutLen) % if it's not a valid number
             minBoutLen = 0;
         end
+        % run the bout length enforcement algorithm
         G.labels = enforceMinDuration(G.labels, ones(1,3) * ceil(minBoutLen / G.epochLen),...
             [2 1 3], 0);
         updatePoly;
         G.unsavedChanges = 1;
         updateState;
         updatePlots;
-        minPlot;
+        clusterPlot;
         defocus(src);
     end
 
-    function minNREM(src,~) % set NREM boundaries
-        getPoly(3);
-        defocus(src);
+    function clusterNREM(src,~) % set NREM boundaries
+        getPoly(3); % get the polygon input from the user
+        if isvalid(src) % if the widget is still up
+            defocus(src);
+        end
     end
 
-    function minWake(src,~)
+    function clusterWake(src,~)
         getPoly(2);
-        defocus(src);
+        if isvalid(src)
+            defocus(src);
+        end
     end
 
-    function minREM(src,~)
+    function clusterREM(src,~)
         getPoly(1);
-        defocus(src);
+        if isvalid(src)
+            defocus(src);
+        end
     end
 
-    function updatePoly()
-        for i = 1:3
-            X = [];
+    function updatePoly() % find the boundary enclosing all epochs of each state
+        for i = 1:3 % for each state
+            % get epochs of the state
             idx = find(G.labels == i);
-            if isempty(idx)
+            if length(idx) < 3 % can't have a polygon with fewer than 3 sides
                 continue
             end
+            % format the x-y data
+            X = [];
             X(:,1) = G.processedEMG(idx);
             X(:,2) = G.TDR(idx);
-            k = convhull(X);
+            k = convhull(X); % calculate the boundary
+            % store the new polygon
             G.polygons{i} = [];
             G.polygons{i}(:,1) = G.processedEMG(idx(k(1:end-1)));
             G.polygons{i}(:,2) = G.TDR(idx(k(1:end-1)));
         end
     end
 
-    function getPoly(state)
-        h = impoly(G.minAxes);
+    function getPoly(state) % have the user draw a polygon around a cluster
+        % display instructions
+        states = {'REM','Wake','NREM'};
+        text_handle = text(.5,.95,['Draw the ',states{state},' polygon'],...
+            'Units','normalized','Color','r','HorizontalAlignment','center');
+        h = impoly(G.clusterAxes); % get the polygon
+        delete(text_handle);
         if isempty(h) % didn't finish drawing it
             return
         end
-        G.polygons{state} = h.getPosition;
-        h.delete;
+        G.polygons{state} = h.getPosition; % store the polygon data
+        h.delete; % delete it
+        % determine which epochs are inside the polygon
         in = inpolygon(G.processedEMG,G.TDR,G.polygons{state}(:,1),G.polygons{state}(:,2));
-        G.labels(in) = state;
-        updatePoly;
+        G.labels(in) = state; % set those labels to the selected state
+        updatePoly; % update other polygons as necessary
         G.unsavedChanges = 1;
         updateState;
         updatePlots;
-        minPlot;
+        clusterPlot;
     end
 
 % other functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
