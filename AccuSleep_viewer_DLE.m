@@ -1,7 +1,7 @@
 function [message] = AccuSleep_viewer_DLE(EEG, EMG, SR, epochLen, userLabels, laser,savepath)
 %AccuSleep_viewer A GUI for manually assigning sleep stage labels to EEG/EMG data.
 % Dan Lab Edition: can also display laser stimuli
-%   Zeke Barger 121519
+%   Zeke Barger 032220
 %   Arguments:
 %   EEG: the EEG signal as a vector
 %   EMG: the EMG signal as a vector
@@ -179,10 +179,16 @@ if ~isempty(laser) % if there are some laser stimuli
     G.laser_by_epoch=G.laser_by_epoch*3+.5;
 end
 
+% some things we need for using Min's method
+G.minWindowUp = 0; % whether Min's scoring window is showing
+G.theta_f = G.f >= 6 & G.f <= 9;
+G.delta_f = G.f >= 1 & G.f <= 5;
+G.TDR = log(mean(G.spectrogram(:,G.theta_f),2)) ./ log(mean(G.spectrogram(:,G.delta_f),2));
+G.polygons = cell(1,3);
+
 % todo: checkbox
 
 %% Make the figure window
-
 WIN = figure('Units', 'Normalized', 'CloseRequestFcn',@closeReq,...
     'Position', [0.08, 0.12, 0.83, 0.75],'KeyPressFcn',@keypress,...
     'Menubar', 'none','Color', 'w', 'Name', 'AccuSleep_viewer_DLE');
@@ -279,6 +285,9 @@ G.showMenu = uicontrol(WIN,'Style','popupmenu','Units','normalized',...
     'Position',[0.93 0.54 0.062 0.02],'Callback', @fct_showmenu,...
     'String',{'Show 1 epoch','Show 3 epochs','Show 5 epochs','Show 7 epochs','Show 9 epochs'},...
     'Value',3);
+G.minbtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
+    'Position',[.93 .19 .062 .05],'String',"<html>Min's<br>method",'Callback',@minMethod,...
+    'FontSize',9);
 G.rangebtn = uicontrol(WIN,'Style','pushbutton','Units','normalized','BackgroundColor',[.92 .92 .92],...
     'Position',[.93 .16 .062 .025],'String','set range','Callback',@setRange,...
     'FontSize',9,'ToolTip',sprintf(['Set state for range of timepoints (*)',...
@@ -335,9 +344,7 @@ axes(G.A1);
 message = 'Data loaded successfully';
 
 %% Functions used by buttons, keypresses, etc.
-    function updatePlots(~, ~) % update plots when something changes
-        
-        
+    function updatePlots(~, ~) % update plots when something changes          
         % plot sleep stage in the lower panel
         n = (G.show-1)/2; % number of bins on either side of center to show
         tp = G.timepointS; % time in seconds at the center of the screen
@@ -397,8 +404,7 @@ message = 'Data loaded successfully';
             G.emgYlim(1)+.1*diff(G.emgYlim)],'Color','r', 'LineWidth', .5);
         line(G.A6,[G.timepointS-G.epochLen/2, G.timepointS+G.epochLen/2],...
             [G.emgYlim(1) G.emgYlim(1)],...
-            'Color','r', 'LineWidth', .5);
-        
+            'Color','r', 'LineWidth', .5);      
         
         cla(G.A6a)
         hold(G.A6a, 'on');
@@ -466,6 +472,10 @@ message = 'Data loaded successfully';
                 xlim(G.A2,li + min([G.lims(2)-li(2), tp-li(1)-.65*diff(li)]))
             end
         end
+        
+        if G.minWindowUp
+           minPlot; 
+        end
     end
 
     function updateState() % update the sleep stage image
@@ -495,6 +505,7 @@ message = 'Data loaded successfully';
             im(i,state==4) = 4;
         end
     end
+
 
 % Process keypresses
     function keypress(~, evt)
@@ -655,8 +666,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function brightSpect(src,~)
-        
+    function brightSpect(src,~)       
         G.cmax = G.cmax - G.cmax/10;
         G.caxis1 = [G.caxis1(1), G.cmax];
         caxis(G.A3,G.caxis1)
@@ -664,8 +674,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function dimSpect(src,~)
-        
+    function dimSpect(src,~)    
         G.cmax = G.cmax + G.cmax/10;
         G.caxis1 = [G.caxis1(1), G.cmax];
         caxis(G.A3,G.caxis1)
@@ -688,8 +697,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function fct_showmenu(src, ~)
-        
+    function fct_showmenu(src, ~)      
         options = 1:2:9;
         G.show = options(src.Value);
         G.mid = ceil(G.show/2);
@@ -704,22 +712,19 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function fct_shiftdownEEG(src,~)
-        
+    function fct_shiftdownEEG(src,~)        
         G.eegYlim = [G.eegYlim(1)-.04*diff(G.eegYlim), G.eegYlim(2)-.04*diff(G.eegYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_shiftupEMG(src,~)
-        
+    function fct_shiftupEMG(src,~)      
         G.emgYlim = [G.emgYlim(1)+.04*diff(G.emgYlim), G.emgYlim(2)+.04*diff(G.emgYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_shiftdownEMG(src,~)
-        
+    function fct_shiftdownEMG(src,~)       
         G.emgYlim = [G.emgYlim(1)-.04*diff(G.emgYlim), G.emgYlim(2)-.04*diff(G.emgYlim)];
         updatePlots;
         defocus(src);
@@ -732,8 +737,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function fct_zoomin_t(src,~)
-        
+    function fct_zoomin_t(src,~)        
         axes(G.A3);
         curlims = xlim;
         xlim([max(curlims(1), G.timepointH-.45*diff(curlims)) min(curlims(2),...
@@ -741,8 +745,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function fct_zoomout_t(src,~)
-        
+    function fct_zoomout_t(src,~)        
         axes(G.A3);
         curlims = xlim;
         xlim([max(G.lims(1), G.timepointH-1.02*diff(curlims)) min(G.lims(2),...
@@ -750,43 +753,37 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function fct_zoominEEG(src,~)
-        
+    function fct_zoominEEG(src,~)        
         G.eegYlim = [G.eegYlim(1)+.05*diff(G.eegYlim), G.eegYlim(2)-.05*diff(G.eegYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_zoomoutEEG(src,~)
-        
+    function fct_zoomoutEEG(src,~)        
         G.eegYlim = [G.eegYlim(1)-.05*diff(G.eegYlim), G.eegYlim(2)+.05*diff(G.eegYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_zoominEMG(src,~)
-        
+    function fct_zoominEMG(src,~)      
         G.emgYlim = [G.emgYlim(1)+.05*diff(G.emgYlim), G.emgYlim(2)-.05*diff(G.emgYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_zoomoutEMG(src,~)
-        
+    function fct_zoomoutEMG(src,~)       
         G.emgYlim = [G.emgYlim(1)-.05*diff(G.emgYlim), G.emgYlim(2)+.05*diff(G.emgYlim)];
         updatePlots;
         defocus(src);
     end
 
-    function fct_zoomreset_t(src,~) % reset zoom level
-        
+    function fct_zoomreset_t(src,~) % reset zoom level       
         axes(G.A3);
         xlim(G.lims);
         defocus(src);
     end
 
-    function scrollCallback(a,~) % respond to user input in the auto-scroll box
-        
+    function scrollCallback(a,~) % respond to user input in the auto-scroll box      
         G.advance = a.Value;
         defocus(a);
     end
@@ -832,8 +829,7 @@ message = 'Data loaded successfully';
         defocus(src);
     end
 
-    function loadFile(src,~) % load sleep stage labels from file
-        
+    function loadFile(src,~) % load sleep stage labels from file        
         [file,path] = uigetfile('*.mat');
         if ~ischar(file)
             msgbox('No file specified, file not loaded')
@@ -854,9 +850,169 @@ message = 'Data loaded successfully';
         set(src, 'Enable', 'on');
     end
 
-% other functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    function saveFile()
+% functions for Min's scoring method %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % create the window and its contents
+    function minMethod(src,~)
+        if G.minWindowUp
+            return
+        else
+            G.minWindowUp = 1;
+        end
+        % draw the window and buttons
+        G.minBG = uibuttongroup('Position',[.06 .12 .34 .42]);
+        G.minXbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.93 0.92 0.063 0.07],'Callback', @minX,'String','X',...
+            'FontSize',9);
+        G.minClearbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.8 0.18 0.1],'Callback', @minClear,'String','Clear',...
+            'FontSize',9);
+        G.minNREMbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.68 0.18 0.1],'Callback', @minNREM,'String','NREM',...
+            'FontSize',9,'BackgroundColor',[1 .96 .82]);
+        G.minWakebtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.57 0.18 0.1],'Callback', @minWake,'String','Wake',...
+            'FontSize',9,'BackgroundColor',[.86 .88 1]);
+        G.minREMbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.46 0.18 0.1],'Callback', @minREM,'String','REM',...
+            'FontSize',9,'BackgroundColor',[.84 .92 .73]);
+        G.minAssignbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.35 0.18 0.1],'Callback', @minAssign,'String',...
+            '<html>Assign<br>remaining','FontSize',8);
+        G.minDurationbtn = uicontrol(G.minBG,'Style','pushbutton', 'Units','normalized',...
+            'Position',[0.8 0.22 0.18 0.1],'Callback', @minDuration,'String',...
+            '<html>Remove<br>bouts &lt;','FontSize',8);
+        G.minDurationbox = uicontrol(G.minBG,'Style','edit', 'Units','normalized',...
+            'Position',[0.83 0.12 0.12 0.09],'String','5','FontSize',9);
+        G.minDurationtext = uicontrol(G.minBG,'Style','text', 'Units','normalized',...
+            'Position',[0.8 0.07 0.18 0.05],'String','seconds','FontSize',8);
+        G.minAxes = axes(G.minBG,'Position',[.08,.08,.7,.9],'XTick',[],'YTick',[]);
+        ylabel(G.minAxes,'Theta/delta ratio');
+        xlabel(G.minAxes,'EMG');
         
+        % plot TDR and EMG
+        minPlot;
+
+        defocus(src)
+    end
+
+    function minX(src,~) % delete min's scoring window
+        G.minWindowUp = 0;
+        defocus(src);
+        delete(G.minBG);
+    end
+
+    function minPlot()
+        symbols = {'*','+','x','o'}; % symbol for each state
+        cla(G.minAxes);
+        for i = 1:4
+            hold on, line(G.minAxes,G.processedEMG(G.labels==i),G.TDR(G.labels==i),...
+                'Marker',symbols{i},'LineStyle','none','Color',G.colors(i+1,:))
+        end
+        for i = 1:3
+            if ~isempty(G.polygons{i})
+                hold on, patch(G.minAxes,G.polygons{i}(:,1),G.polygons{i}(:,2),[0 0 0],...
+                    'FaceAlpha',0,'EdgeColor',G.colors(i+1,:),...
+                    'EdgeAlpha',1);
+            end
+        end
+    end
+
+    function minClear(src,~) % clear all labels
+        G.labels(:) = 4;
+        G.unsavedChanges = 1;
+        updateState;
+        updatePlots;
+        G.polygons = cell(1,3);
+        minPlot;
+        defocus(src);
+    end
+
+    function minAssign(src,~)
+        if (isempty(G.polygons{1}) || isempty(G.polygons{2})) || isempty(G.polygons{3})
+            return
+        end
+        X_train = [];
+        Y_train = [];
+        X_train(:,1) = G.processedEMG(G.labels ~= 4);
+        X_train(:,2) = G.TDR(G.labels ~= 4);
+        Y_train(:,1) = G.labels(G.labels ~= 4);
+        Mdl = fitcknn(X_train,Y_train,'NumNeighbors',4);
+        X_test = [];
+        X_test(:,1) = G.processedEMG(G.labels == 4);
+        X_test(:,2) = G.TDR(G.labels == 4);
+        G.labels(G.labels == 4) = predict(Mdl,X_test);
+        updatePoly;
+        G.unsavedChanges = 1;
+        updateState;
+        updatePlots;
+        minPlot;
+        defocus(src);
+    end
+
+    function minDuration(src,~)
+        minBoutLen = str2num(get(G.minDurationbox,'String'));
+        if isempty(minBoutLen)
+            minBoutLen = 0;
+        end
+        G.labels = enforceMinDuration(G.labels, ones(1,3) * ceil(minBoutLen / G.epochLen),...
+            [2 1 3], 0);
+        updatePoly;
+        G.unsavedChanges = 1;
+        updateState;
+        updatePlots;
+        minPlot;
+        defocus(src);
+    end
+
+    function minNREM(src,~) % set NREM boundaries
+        getPoly(3);
+        defocus(src);
+    end
+
+    function minWake(src,~)
+        getPoly(2);
+        defocus(src);
+    end
+
+    function minREM(src,~)
+        getPoly(1);
+        defocus(src);
+    end
+
+    function updatePoly()
+        for i = 1:3
+            X = [];
+            idx = find(G.labels == i);
+            if isempty(idx)
+                continue
+            end
+            X(:,1) = G.processedEMG(idx);
+            X(:,2) = G.TDR(idx);
+            k = convhull(X);
+            G.polygons{i} = [];
+            G.polygons{i}(:,1) = G.processedEMG(idx(k(1:end-1)));
+            G.polygons{i}(:,2) = G.TDR(idx(k(1:end-1)));
+        end
+    end
+
+    function getPoly(state)
+        h = impoly(G.minAxes);
+        if isempty(h) % didn't finish drawing it
+            return
+        end
+        G.polygons{state} = h.getPosition;
+        h.delete;
+        in = inpolygon(G.processedEMG,G.TDR,G.polygons{state}(:,1),G.polygons{state}(:,2));
+        G.labels(in) = state;
+        updatePoly;
+        G.unsavedChanges = 1;
+        updateState;
+        updatePlots;
+        minPlot;
+    end
+
+% other functions %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    function saveFile()       
         if isempty(G.savepath) % get file path if we need it
             [file,path] = uiputfile('*.mat');
             if ~ischar(file) % if no file given
@@ -889,8 +1045,7 @@ message = 'Data loaded successfully';
             msgbox('Error: labels variable must be a vector')
             return
         end
-        if checkLen
-            
+        if checkLen          
             if length(x.labels) ~= G.nbins % in the range 1:4
                 msgbox(['Error: labels must be of length ',num2str(G.nbins)])
                 return
