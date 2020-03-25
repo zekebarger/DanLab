@@ -94,7 +94,8 @@ function previewbtn_Callback(~, ~, handles)
 % determine if path is valid
 blockPath = getappdata(handles.C,'blockPath');
 if ~exist(blockPath,'dir')
-    errordlg('No block selected');
+    
+    ('No block selected');
     return
 end
 
@@ -112,7 +113,8 @@ try
     % actually load the data
     blockData = TDT2mat(blockPath,'VERBOSE',0,'T1',0,'T2',T2);
 catch
-    errordlg('Could not load data from the block');
+    errordlg(['Could not load data from the block. Either the block ',...
+        'is not properly formatted, or you need to install OpenDeveloper.']);
     setListLock(handles,0);
     return
 end
@@ -405,7 +407,8 @@ for n = a:b % for each mouse selected
         % load emg
         emgData = TDT2mat(blockPath,'VERBOSE',0,'CHANNEL',EMGch);
     catch
-        errordlg('Could not load data from the block');
+        errordlg(['Could not load data from the block. Either the block ',...
+            'is not properly formatted, or you need to install OpenDeveloper.']);
         setListLock(handles,0);
         return
     end
