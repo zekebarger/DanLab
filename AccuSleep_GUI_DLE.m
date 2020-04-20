@@ -1,6 +1,6 @@
 function varargout = AccuSleep_GUI_DLE(varargin)
 % AccuSleep_GUI_DLE A GUI for classifying rodent sleep stages
-% Zeke Barger 010520
+% Zeke Barger 042020
 % Dan Lab Edition: can load a dirlist of experiments
 % To see the user manual, run this code and press the user manual button, or run:
 % doc AccuSleep_instructions
