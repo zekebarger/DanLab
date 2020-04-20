@@ -551,16 +551,33 @@ if checkMissingEntries(handles, 1, 1)
     return
 end
 
-disptext(handles, 'Working...');
-drawnow;
-
-allRecordings = getappdata(handles.D,'recordings'); % get all the recordings
-
+% When the minimum bout length is much longer than the epoch length, this
+% creates ambiguity that can make the scoring somewhat unreliable. 
 % get minimum bout length
 minBoutLen = str2num(get(handles.boutBox,'String'));
 if isempty(minBoutLen)
     minBoutLen = 0;
 end
+epoch_length = str2double(get(handles.tsBox,'String'));
+if minBoutLen / epoch_length > 5
+    answer = questdlg(...
+        ['When the minimum bout length is much longer ',...
+        'than the epoch length, this creates ambiguity ',...
+        'that can decrease the reliability of the labels. ',....
+        'Consider using a longer epoch length or shorter ',...
+        'minimum bout length.'], ...
+        'WARNING', ...
+        'Continue anyway','Cancel','Cancel');
+    if strcmp(answer,'Cancel')
+        lockInputs(handles,0);
+        return
+    end
+end
+
+disptext(handles, 'Working...');
+drawnow;
+
+allRecordings = getappdata(handles.D,'recordings'); % get all the recordings
 
 % animate
 ind = getappdata(handles.D,'allIndicators');
