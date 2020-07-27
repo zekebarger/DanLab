@@ -306,8 +306,8 @@ cDurationSEM = std(cDuration,[],2)/sqrt(n_mice);
 %% plot simple bout length bar plot
 figure('Color','w','Position',[1242 393 347 268])
 x = [1 2; 4 5; 7 8]; % bar x positions
-y = [cDurationAvg(plot_order),sDurationAvg(plot_order)]; % bar heights
-y_sem = [cDurationSEM(plot_order),sDurationSEM(plot_order)]; % errorbars
+y = [sDurationAvg(plot_order),cDurationAvg(plot_order)]; % bar heights
+y_sem = [sDurationSEM(plot_order),cDurationSEM(plot_order)]; % errorbars
 max_y = zeros(1,3); % hold highest point in each bar plot
 
 for i = 1:3 % for each state
@@ -319,7 +319,7 @@ for i = 1:3 % for each state
     end
     % plot datapoints from individual mice
     for j = 1:n_mice
-        hold on, plot(x(i,:),[cDuration(plot_order(i),j), sDuration(plot_order(i),j)],...
+        hold on, plot(x(i,:),[sDuration(plot_order(i),j), cDuration(plot_order(i),j)],...
             'Marker','o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'LineStyle','--',...
             'Color',[.5 .5 .5])
     end
@@ -358,8 +358,8 @@ figure('Color','w','Position',[470 234 1070 268])
 x = reshape(1:(nBins*2),2,nBins)'+(0:(nBins-1))'; % get bar plot x values
 
 for i = 1:3
-    y = [cHistAvg(plot_order(i),:)',sHistAvg(plot_order(i),:)']; % bar heights
-    y_sem = [cHistSEM(plot_order(i),:)',sHistSEM(plot_order(i),:)']; % errorbars
+    y = [sHistAvg(plot_order(i),:)',cHistAvg(plot_order(i),:)']; % bar heights
+    y_sem = [sHistSEM(plot_order(i),:)',cHistSEM(plot_order(i),:)']; % errorbars
     max_y = zeros(1,nBins); % hold highest point in each bar plot
     bar_handles = cell(1,2);
     subplot(1,3,i); % make a subplot
@@ -373,7 +373,7 @@ for i = 1:3
     % plot datapoints from individual mice
     for j = 1:n_mice
         for k = 1:nBins
-            hold on, plot(x(k,:),[cHistos(plot_order(i),k,j), sHistos(plot_order(i),k,j)],...
+            hold on, plot(x(k,:),[sHistos(plot_order(i),k,j), cHistos(plot_order(i),k,j)],...
                 'Marker','o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'LineStyle','--',...
                 'Color',[.5 .5 .5],'MarkerSize',4)
         end
@@ -434,8 +434,8 @@ cCountSEM = std(cCount,[],2)/sqrt(n_mice);
 %% plot bar plots of count numbers
 figure('Color','w','Position',[1307 331 347 268])
 x = [1 2; 4 5; 7 8]; % bar x positions
-y = [cCountAvg(plot_order),sCountAvg(plot_order)]; % bar heights
-y_sem = [cCountSEM(plot_order),sCountSEM(plot_order)]; % errorbars
+y = [sCountAvg(plot_order),cCountAvg(plot_order)]; % bar heights
+y_sem = [sCountSEM(plot_order),cCountSEM(plot_order)]; % errorbars
 max_y = zeros(1,3); % hold highest point in each bar plot
 
 for i = 1:3 % for each state
@@ -447,7 +447,7 @@ for i = 1:3 % for each state
     end
     % plot datapoints from individual mice
     for j = 1:n_mice
-        hold on, plot(x(i,:),[cCount(plot_order(i),j), sCount(plot_order(i),j)],...
+        hold on, plot(x(i,:),[sCount(plot_order(i),j), cCount(plot_order(i),j)],...
             'Marker','o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'LineStyle','--',...
             'Color',[.5 .5 .5])
     end
@@ -497,8 +497,8 @@ cLatencySEM = std(cLatency)/sqrt(n_mice);
 %% bar plot of NREM latencies
 figure('Color','w','Position',[1430 254 255 268])
 x = [1 2]; % bar x positions
-y = [cLatencyAvg,sLatencyAvg]; % bar heights
-y_sem = [cLatencySEM,sLatencySEM]; % errorbars
+y = [sLatencyAvg,cLatencyAvg]; % bar heights
+y_sem = [sLatencySEM,cLatencySEM]; % errorbars
 
 face_colors = [1 1 1; colors(3,:)];
 bar_handles = cell(1,2);
@@ -509,7 +509,7 @@ for j = 1:2 % for each treatment
 end
 % plot datapoints from individual mice
 for j = 1:n_mice
-    hold on, plot(x,[cLatency(j), sLatency(j)],'Marker','o','MarkerFaceColor',...
+    hold on, plot(x,[sLatency(j), cLatency(j)],'Marker','o','MarkerFaceColor',...
         'w','MarkerEdgeColor',[.5 .5 .5],'LineStyle','--','Color',[.5 .5 .5])
 end
 % get highest point in the bar plot
