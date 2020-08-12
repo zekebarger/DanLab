@@ -1,4 +1,4 @@
-% zeke barger 121519
+% zeke barger 081120
 % look through a folder to see if the .mat files inside collectively
 %   contain exactly one variable with each name
 % input
@@ -45,7 +45,7 @@ varsFound = zeros(1,nVars);
 % for each file
 for i = 1:nFiles
     % get full name of the file
-    fName = [d{2,matIdx(i)},'\',d{1,matIdx(i)}];
+    fName = [d{2,matIdx(i)},filesep,d{1,matIdx(i)}];
     % for each variable
     for j = 1:nVars
         % if variable is in the file
