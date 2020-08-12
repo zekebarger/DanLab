@@ -1,5 +1,5 @@
 function varargout = AS_exportTDT(varargin)
-% zeke barger 032020
+% zeke barger 081120
 % Exports EEG/EMG recording from TDT system into a format that can be
 % interpreted by AccuSleep. The onsets and offsets of laser stimuli, if
 % present are saved (in seconds).
@@ -191,6 +191,7 @@ function namebox_Callback(hObject, ~, handles)
 % update the stored name
 s = get(hObject,'String');
 s = strip(s,'\');
+s = strip(s,'/');
 set(handles.namebox,'String',s)
 setappdata(handles.C,'outputName1',s);
 
@@ -290,6 +291,7 @@ function namebox2_Callback(hObject, eventdata, handles)
 % update the stored name
 s = get(hObject,'String');
 s = strip(s,'\');
+s = strip(s,'/');
 set(handles.namebox2,'String',s)
 setappdata(handles.C,'outputName2',s);
 
@@ -387,11 +389,11 @@ for n = a:b % for each mouse selected
     end
     
     % make sure last character of output folder location is \
-    if ~strcmp(location(end),'\')
-        location = [location,'\'];
+    if ~strcmp(location(end),filesep)
+        location = [location,filesep];
     end
     % opposite for output folder name
-    if contains(outputName,'\')
+    if contains(outputName,{'\','/'})
         errordlg(['Output folder name should not contain slashes. ',...
             'A good folder name might be the date of the experiment']);
         setListLock(handles,0);
@@ -478,11 +480,11 @@ for n = a:b % for each mouse selected
     % new way of saving laser data (more compact)
     if ~isempty(onsets) && ~isempty(offsets)   
         laser = [onsets, offsets];
-        save([location,outputName,'\laser.mat'],'laser');
+        save([location,outputName,filesep,'laser.mat'],'laser');
     end
     
-    save([location,outputName,'\EEG.mat'],'EEG');
-    save([location,outputName,'\EMG.mat'],'EMG');
+    save([location,outputName,filesep,'EEG.mat'],'EEG');
+    save([location,outputName,filesep,'EMG.mat'],'EMG');
     
     warning('on','MATLAB:colon:nonIntegerIndex');
     disptext(handles, ['Finished processing data for mouse ',num2str(n)])
