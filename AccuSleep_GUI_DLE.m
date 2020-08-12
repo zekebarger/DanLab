@@ -1,6 +1,6 @@
 function varargout = AccuSleep_GUI_DLE(varargin)
 % AccuSleep_GUI_DLE A GUI for classifying rodent sleep stages
-% Zeke Barger 042020
+% Zeke Barger 081120
 % Dan Lab Edition: can load a dirlist of experiments
 % To see the user manual, run this code and press the user manual button, or run:
 % doc AccuSleep_instructions
@@ -587,6 +587,9 @@ codes = animateBoxes([ind{1}(4),...
 % get SR of the EEG/EMG data
 oldSR = str2num(get(handles.srBox,'String'));
 
+% measure time it takes for scoring
+timer_val = tic;
+
 % try to classify all recordings
 newLabels = {}; % holds new labels for each recording
 for i = 1:length(allRecordings)
@@ -673,7 +676,30 @@ for i = 1:length(allRecordings)
     labels = newLabels{i};
     save(allRecordings{i}.labelpath, 'labels'); 
 end
-disptext(handles, 'Finished scoring recordings.'); 
+
+% calculate elapsed time
+elapsed_time = toc(timer_val); % get time in seconds
+hhmmss = []; % break into hours, minutes, seconds
+hhmmss(1) = floor(elapsed_time  / (60*60)); % get number of hours
+hhmmss(2) = floor((elapsed_time - hhmmss(1)*60*60)  / 60); % get number of minutes
+hhmmss(3) = round(100*(elapsed_time - hhmmss(1)*60*60 - hhmmss(2)*60))/100; % get number of minutes
+time_strings = {'hour','minute','second'};
+full_string = [];
+for i = 1:2
+    if hhmmss(i) == 0
+        continue
+    end
+    if hhmmss(i) ~= 1
+        time_strings{i} = [time_strings{i},'s'];
+    end
+    full_string = [full_string, num2str(hhmmss(i)), ' ', time_strings{i},', '];
+end
+if hhmmss(3) ~= 1
+    time_strings{3} = [time_strings{3},'s'];
+end
+full_string = [full_string, num2str(hhmmss(3)), ' ', time_strings{3},'.'];
+
+disptext(handles, ['Finished scoring in ', full_string]);
 lockInputs(handles,0); % unlock inputs
 
 
