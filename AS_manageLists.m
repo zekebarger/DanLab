@@ -1,4 +1,4 @@
-% zeke barger 120619
+% zeke barger 081120
 % TODO disable addbelow... it isn't getting updated :/
 
 function varargout = AS_manageLists(varargin)
@@ -480,7 +480,7 @@ if isempty(listX)
 end
 
 % open dialog box to get new drive name
-idx = strfind(listX{1},'\');
+idx = strfind(listX{1},filesep);
 oldName = listX{1}(1:(idx(1)-1));
 name = inputdlg('Enter new hard drive name for all entries in the list (including the colon):',...
     'Drive name',[1 40],{oldName});
@@ -496,7 +496,7 @@ if ~isempty(name)
         % get the string
         s = listX{i};
         % remove up to first slash
-        idx = strfind(s,'\');
+        idx = strfind(s,filesep);
         listX{i} = [name,s(idx(1):end)];
     end
     setappdata(handles.C,['current',ps],listX);
@@ -582,7 +582,7 @@ function [s] = getStringUntilLastSlash(s)
 if isempty(s)
     return
 end
-idx = strfind(s,'\');
+idx = strfind(s,filesep);
 s = s(1 : (idx(end)-1));
 
 % --- Executes on key release with focus on figure1 or any of its controls.
