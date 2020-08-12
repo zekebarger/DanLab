@@ -1,4 +1,4 @@
-% zeke barger 052420
+% zeke barger 081120
 % Convert data from Min's format into something AccuSleep can use
 % inputs:
 % min_file: name of a file in Min's format
@@ -21,5 +21,5 @@ laser = [M.recordingFile.LasT(laser_start_idx,1),...
     M.recordingFile.LasT(laser_end_idx,1)];
 
 % save these
-save([output_folder,'\labels.mat'],'labels');
-save([output_folder,'\laser.mat'],'laser');
+save([output_folder,filesep,'labels.mat'],'labels');
+save([output_folder,filesep,'laser.mat'],'laser');
