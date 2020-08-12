@@ -1,5 +1,5 @@
 function varargout = AS_exportIntan(varargin)
-% zeke barger 070720
+% zeke barger 081120
 % Exports EEG/EMG recording from Intan system into a format that can be
 % interpreted by AccuSleep. The onsets and offsets of laser stimuli, if
 % present are saved (in seconds).
@@ -120,6 +120,7 @@ function namebox_Callback(hObject, ~, handles)
 % update the stored name
 s = get(hObject,'String');
 s = strip(s,'\');
+s = strip(s,'/');
 set(handles.namebox,'String',s)
 setappdata(handles.C,'outputName1',s);
 
@@ -219,6 +220,7 @@ function namebox2_Callback(hObject, eventdata, handles)
 % update the stored name
 s = get(hObject,'String');
 s = strip(s,'\');
+s = strip(s,'/');
 set(handles.namebox2,'String',s)
 setappdata(handles.C,'outputName2',s);
 
@@ -320,11 +322,11 @@ for n = a:b % for each mouse selected
     end
     
     % make sure last character of output folder location is \
-    if ~strcmp(location(end),'\')
-        location = [location,'\'];
+    if ~strcmp(location(end),filesep)
+        location = [location,filesep];
     end
     % opposite for output folder name
-    if contains(outputName,'\')
+    if contains(outputName,{'\','/'})
         errordlg(['Output folder name should not contain slashes. ',...
             'A good folder name might be the date of the experiment']);
         setListLock(handles,0);
@@ -344,7 +346,7 @@ for n = a:b % for each mouse selected
         return
     end
     
-    originalSR = getSR([blockPath,'\',settingsFilename]); % get sampling rate
+    originalSR = getSR([blockPath,filesep,settingsFilename]); % get sampling rate
     
     % try to load the data
     eegMatch = contains(all_files,[string(['CH',num2str(EEGch),'.']), ...
@@ -378,9 +380,9 @@ for n = a:b % for each mouse selected
     
     % actually load them all
     try
-        [eegData, ~, ~] = load_open_ephys_data([blockPath,'\',eegFilename]);
-        [emgData, ~, ~] = load_open_ephys_data([blockPath,'\',emgFilename]);
-        [laserData, ~, ~] = load_open_ephys_data([blockPath,'\',laserFilename]);
+        [eegData, ~, ~] = load_open_ephys_data([blockPath,filesep,eegFilename]);
+        [emgData, ~, ~] = load_open_ephys_data([blockPath,filesep,emgFilename]);
+        [laserData, ~, ~] = load_open_ephys_data([blockPath,filesep,laserFilename]);
     catch
         errordlg('Error loading files.');
         setListLock(handles,0);
@@ -417,11 +419,11 @@ for n = a:b % for each mouse selected
     % new way of saving laser data (more compact)
     if ~isempty(onsets) && ~isempty(offsets)
         laser = [onsets, offsets];
-        save([location,outputName,'\laser.mat'],'laser');
+        save([location,outputName,filesep,'laser.mat'],'laser');
     end
     
-    save([location,outputName,'\EEG.mat'],'EEG');
-    save([location,outputName,'\EMG.mat'],'EMG');
+    save([location,outputName,filesep,'EEG.mat'],'EEG');
+    save([location,outputName,filesep,'EMG.mat'],'EMG');
     
     warning('on','MATLAB:colon:nonIntegerIndex');
     disptext(handles, ['Finished processing data for mouse ',num2str(n)])
@@ -579,7 +581,7 @@ else
     return
 end
 
-originalSR = getSR([blockPath,'\',settingsFilename]); % get sampling rate
+originalSR = getSR([blockPath,filesep,settingsFilename]); % get sampling rate
 
 % try to load the data
 chMatch = contains(all_files,"CH");
@@ -595,7 +597,7 @@ end
 chdata = {};
 try
     for i = 1:length(chFilenames)
-        chdata{i} = load_open_ephys_data([blockPath,'\',chFilenames{i}],...
+        chdata{i} = load_open_ephys_data([blockPath,filesep,chFilenames{i}],...
             'Indices',1:(originalSR*60*20));
     end
 catch
