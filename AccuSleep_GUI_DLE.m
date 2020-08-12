@@ -937,7 +937,7 @@ drawnow;
 
 % from filename, get containing directory
 function [d] = getDir(f)
-s = strfind(f,'\');
+s = strfind(f,filesep);
 d = f(1:s(end));
 
 
